@@ -493,38 +493,38 @@ func parseHLedgerPrices(output string, defaultCurrency string) ([]price.Price, e
 
 func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price, error) {
 	var prices []price.Price
-	
+
 	// Parse CSV output from bean-query
 	reader := csv.NewReader(strings.NewReader(output))
 	records, err := reader.ReadAll()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Skip header row if present
 	startIndex := 0
 	if len(records) > 0 && records[0][0] == "date" {
 		startIndex = 1
 	}
-	
+
 	for i := startIndex; i < len(records); i++ {
 		record := records[i]
 		if len(record) < 4 {
 			continue
 		}
-		
+
 		// CSV columns: date, currency, amount_number, amount_currency
 		dateStr := strings.TrimSpace(record[0])
 		commodity := utils.UnQuote(strings.TrimSpace(record[1]))
 		amountStr := strings.TrimSpace(record[2])
 		target := utils.UnQuote(strings.TrimSpace(record[3]))
-		
+
 		// Parse the value
 		value, err := decimal.NewFromString(amountStr)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Filter by default currency (same logic as before)
 		if target != defaultCurrency {
 			if commodity == defaultCurrency && !value.Equal(decimal.Zero) {
@@ -535,15 +535,15 @@ func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price,
 				continue
 			}
 		}
-		
+
 		date, err := time.ParseInLocation("2006-01-02", dateStr, config.TimeZone())
 		if err != nil {
 			return nil, err
 		}
-		
+
 		prices = append(prices, price.Price{Date: date, CommodityName: commodity, CommodityID: commodity, CommodityType: config.Unknown, Value: value})
 	}
-	
+
 	return prices, nil
 }
 
