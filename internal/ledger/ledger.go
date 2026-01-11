@@ -494,6 +494,8 @@ func parseHLedgerPrices(output string, defaultCurrency string) ([]price.Price, e
 func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price, error) {
 	var prices []price.Price
 
+	const expectedCSVColumns = 4
+
 	// Parse CSV output from bean-query
 	reader := csv.NewReader(strings.NewReader(output))
 	records, err := reader.ReadAll()
@@ -503,13 +505,16 @@ func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price,
 
 	// Skip header row if present
 	startIndex := 0
-	if len(records) > 0 && records[0][0] == "date" {
-		startIndex = 1
+	if len(records) > 0 && len(records[0]) > 0 {
+		firstCell := strings.TrimSpace(strings.ToLower(utils.UnQuote(records[0][0])))
+		if firstCell == "date" {
+			startIndex = 1
+		}
 	}
 
 	for i := startIndex; i < len(records); i++ {
 		record := records[i]
-		if len(record) < 4 {
+		if len(record) < expectedCSVColumns {
 			continue
 		}
 

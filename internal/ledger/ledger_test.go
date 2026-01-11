@@ -150,4 +150,19 @@ func TestParseBeancountPrices(t *testing.T) {
 	parsedPrices, _ = parseBeancountPrices(csvQuoted, "EUR")
 	assert.Len(t, parsedPrices, 1)
 	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
+
+	// Test with different header case variations
+	csvMixedCase := `Date,Currency,Amount_Number,Amount_Currency
+2023-05-01,USD,0.9,EUR
+`
+	parsedPrices, _ = parseBeancountPrices(csvMixedCase, "EUR")
+	assert.Len(t, parsedPrices, 1)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
+
+	csvUpperCase := `DATE,CURRENCY,AMOUNT_NUMBER,AMOUNT_CURRENCY
+2023-05-01,USD,0.9,EUR
+`
+	parsedPrices, _ = parseBeancountPrices(csvUpperCase, "EUR")
+	assert.Len(t, parsedPrices, 1)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
 }
