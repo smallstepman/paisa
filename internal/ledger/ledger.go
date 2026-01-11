@@ -228,18 +228,7 @@ func (Beancount) ValidateFile(journalPath string) ([]LedgerFileError, string, er
 	var output, error bytes.Buffer
 	err = utils.Exec(path, &output, &error, journalPath)
 	if err == nil {
-
-		path, err = binary.LookPath("bean-report")
-		if err != nil {
-			return errors, "", err
-		}
-
-		err = utils.Exec(path, &output, &error, journalPath, "bal")
-		if err != nil {
-			log.Error(error.String())
-			return nil, "", err
-		}
-		return errors, utils.Dos2Unix(output.String()), nil
+		return errors, "", nil
 	}
 
 	re := regexp.MustCompile(`(?:.*):([0-9]+):\s+(.+)`)
@@ -401,14 +390,14 @@ func (Beancount) Parse(journalPath string, prices []price.Price) ([]*posting.Pos
 
 func (Beancount) Prices(journalPath string) ([]price.Price, error) {
 	var prices []price.Price
-	path, err := binary.LookPath("bean-report")
+	path, err := binary.LookPath("bean-query")
 	if err != nil {
 		log.Error(err)
 		return prices, err
 	}
 
 	var output, error bytes.Buffer
-	err = utils.Exec(path, &output, &error, journalPath, "pricesdb")
+	err = utils.Exec(path, &output, &error, "-f", "csv", journalPath, "SELECT date, currency, amount_number, amount_currency FROM price")
 	if err != nil {
 		log.Error(error.String())
 		return prices, err
@@ -504,16 +493,39 @@ func parseHLedgerPrices(output string, defaultCurrency string) ([]price.Price, e
 
 func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price, error) {
 	var prices []price.Price
-	re := regexp.MustCompile(`(\d{4}-\d{2}-\d{2}) price ([^ ]+)\s*([^\n]+)\n`)
-	matches := re.FindAllStringSubmatch(output, -1)
-
-	for _, match := range matches {
-		target, value, err := parseAmount(match[3])
+	
+	// Parse CSV output from bean-query
+	reader := csv.NewReader(strings.NewReader(output))
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	
+	// Skip header row if present
+	startIndex := 0
+	if len(records) > 0 && records[0][0] == "date" {
+		startIndex = 1
+	}
+	
+	for i := startIndex; i < len(records); i++ {
+		record := records[i]
+		if len(record) < 4 {
+			continue
+		}
+		
+		// CSV columns: date, currency, amount_number, amount_currency
+		dateStr := strings.TrimSpace(record[0])
+		commodity := utils.UnQuote(strings.TrimSpace(record[1]))
+		amountStr := strings.TrimSpace(record[2])
+		target := utils.UnQuote(strings.TrimSpace(record[3]))
+		
+		// Parse the value
+		value, err := decimal.NewFromString(amountStr)
 		if err != nil {
 			return nil, err
 		}
-
-		commodity := utils.UnQuote(match[2])
+		
+		// Filter by default currency (same logic as before)
 		if target != defaultCurrency {
 			if commodity == defaultCurrency && !value.Equal(decimal.Zero) {
 				commodity = target
@@ -523,15 +535,15 @@ func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price,
 				continue
 			}
 		}
-
-		date, err := time.ParseInLocation("2006-01-02", match[1], config.TimeZone())
+		
+		date, err := time.ParseInLocation("2006-01-02", dateStr, config.TimeZone())
 		if err != nil {
 			return nil, err
 		}
-
+		
 		prices = append(prices, price.Price{Date: date, CommodityName: commodity, CommodityID: commodity, CommodityType: config.Unknown, Value: value})
-
 	}
+	
 	return prices, nil
 }
 

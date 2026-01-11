@@ -110,3 +110,44 @@ func TestParseAmount(t *testing.T) {
 	assert.Equal(t, "BTC", commodity)
 	assert.Equal(t, 1e-06, amount.InexactFloat64())
 }
+
+func TestParseBeancountPrices(t *testing.T) {
+	// Test CSV format with header
+	csvWithHeader := `date,currency,amount_number,amount_currency
+2023-05-01,USD,0.9,EUR
+2023-05-02,EUR,1.1,USD
+`
+	parsedPrices, _ := parseBeancountPrices(csvWithHeader, "EUR")
+	assert.Len(t, parsedPrices, 2)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
+	assertPriceEqual(t, parsedPrices[1], "2023/05/02", "USD", 0.9090909090909091)
+
+	// Test CSV format without header
+	csvWithoutHeader := `2023-05-01,USD,0.9,EUR
+2023-05-02,NIFTY,100.273,INR
+`
+	parsedPrices, _ = parseBeancountPrices(csvWithoutHeader, "EUR")
+	assert.Len(t, parsedPrices, 1)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
+
+	// Test normal case (target currency matches default)
+	csvNormal := `2023-05-01,USD,80.442048,INR
+`
+	parsedPrices, _ = parseBeancountPrices(csvNormal, "INR")
+	assert.Len(t, parsedPrices, 1)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 80.442048)
+
+	// Test filtering out non-matching currencies
+	csvNonMatching := `2023-05-01,USD,0.9,EUR
+2023-05-02,EUR,1.1,GBP
+`
+	parsedPrices, _ = parseBeancountPrices(csvNonMatching, "INR")
+	assert.Len(t, parsedPrices, 0)
+
+	// Test with quoted values
+	csvQuoted := `2023-05-01,"USD",0.9,"EUR"
+`
+	parsedPrices, _ = parseBeancountPrices(csvQuoted, "EUR")
+	assert.Len(t, parsedPrices, 1)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
+}
