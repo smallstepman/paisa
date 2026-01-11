@@ -166,3 +166,43 @@ func TestParseBeancountPrices(t *testing.T) {
 	assert.Len(t, parsedPrices, 1)
 	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
 }
+
+func TestBeancountPrices_FixtureScenario(t *testing.T) {
+	// This is what bean-query returns for the inr-beancount fixture
+	csvOutput := `date,currency,amount_number,amount_currency
+2022-01-07,NIFTY,100,INR
+2022-02-07,NIFTY,100.273,INR
+2022-01-08,USD,80.442048,INR`
+
+	parsedPrices, err := parseBeancountPrices(csvOutput, "INR")
+	assert.NoError(t, err)
+	assert.Len(t, parsedPrices, 3, "Should parse exactly 3 prices")
+
+	// Count by commodity
+	niftyPrices := 0
+	usdPrices := 0
+	for _, p := range parsedPrices {
+		if p.CommodityName == "NIFTY" {
+			niftyPrices++
+		}
+		if p.CommodityName == "USD" {
+			usdPrices++
+		}
+	}
+
+	assert.Equal(t, 2, niftyPrices, "Should have 2 NIFTY prices")
+	assert.Equal(t, 1, usdPrices, "Should have 1 USD price")
+
+	// Verify specific values match expected price.json
+	assert.Equal(t, "NIFTY", parsedPrices[0].CommodityName)
+	assert.Equal(t, 100.0, parsedPrices[0].Value.InexactFloat64())
+	assert.Equal(t, "2022-01-07", parsedPrices[0].Date.Format("2006-01-02"))
+
+	assert.Equal(t, "NIFTY", parsedPrices[1].CommodityName)
+	assert.Equal(t, 100.273, parsedPrices[1].Value.InexactFloat64())
+	assert.Equal(t, "2022-02-07", parsedPrices[1].Date.Format("2006-01-02"))
+
+	assert.Equal(t, "USD", parsedPrices[2].CommodityName)
+	assert.Equal(t, 80.442048, parsedPrices[2].Value.InexactFloat64())
+	assert.Equal(t, "2022-01-08", parsedPrices[2].Date.Format("2006-01-02"))
+}
