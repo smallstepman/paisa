@@ -228,18 +228,7 @@ func (Beancount) ValidateFile(journalPath string) ([]LedgerFileError, string, er
 	var output, error bytes.Buffer
 	err = utils.Exec(path, &output, &error, journalPath)
 	if err == nil {
-
-		path, err = binary.LookPath("bean-report")
-		if err != nil {
-			return errors, "", err
-		}
-
-		err = utils.Exec(path, &output, &error, journalPath, "bal")
-		if err != nil {
-			log.Error(error.String())
-			return nil, "", err
-		}
-		return errors, utils.Dos2Unix(output.String()), nil
+		return errors, "", nil
 	}
 
 	re := regexp.MustCompile(`(?:.*):([0-9]+):\s+(.+)`)
@@ -401,20 +390,61 @@ func (Beancount) Parse(journalPath string, prices []price.Price) ([]*posting.Pos
 
 func (Beancount) Prices(journalPath string) ([]price.Price, error) {
 	var prices []price.Price
-	path, err := binary.LookPath("bean-report")
+	path, err := binary.LookPath("bean-query")
 	if err != nil {
 		log.Error(err)
 		return prices, err
 	}
 
 	var output, error bytes.Buffer
-	err = utils.Exec(path, &output, &error, journalPath, "pricesdb")
+	// Fetch explicit prices
+	args := []string{"-f", "csv", journalPath, "select date,currency,currency(amount),number(amount) from prices"}
+	err = utils.Exec(path, &output, &error, args...)
 	if err != nil {
 		log.Error(error.String())
 		return prices, err
 	}
 
-	return parseBeancountPrices(utils.Dos2Unix(output.String()), config.DefaultCurrency())
+	explicitPrices, err := parseBeancountPrices(utils.Dos2Unix(output.String()), config.DefaultCurrency())
+	if err != nil {
+		return nil, err
+	}
+	prices = append(prices, explicitPrices...)
+
+	// Fetch implicit prices from transaction costs
+	// bean-report pricesdb includes prices inferred from transactions with cost basis.
+	// We divide cost by units to get the unit price, and filter out entries where cost equals units (simple transactions 1:1).
+	args = []string{"-f", "csv", journalPath, "select date,currency,currency(cost(position)),number(cost(position))/number(units(position)) from postings where cost(position) IS NOT NULL"}
+	err = utils.Exec(path, &output, &error, args...)
+	if err != nil {
+		log.Errorf("Failed to fetch implicit prices: %s", error.String())
+		// We continue with just explicit prices if this fails, as it might be a query error or no postings
+	} else {
+		implicitPrices, err := parseBeancountPrices(utils.Dos2Unix(output.String()), config.DefaultCurrency())
+		if err == nil {
+			prices = append(prices, implicitPrices...)
+		} else {
+			log.Warnf("Failed to parse implicit prices from cost: %v", err)
+		}
+	}
+
+	// Fetch implicit prices from transaction price annotations (@ 100.273 INR)
+	output.Reset()
+	error.Reset()
+	args = []string{"-f", "csv", journalPath, "select date,currency,currency(price),number(price) from postings where price IS NOT NULL"}
+	err = utils.Exec(path, &output, &error, args...)
+	if err != nil {
+		log.Errorf("Failed to fetch implicit prices from annotations: %s", error.String())
+	} else {
+		implicitPrices, err := parseBeancountPrices(utils.Dos2Unix(output.String()), config.DefaultCurrency())
+		if err == nil {
+			prices = append(prices, implicitPrices...)
+		} else {
+			log.Warnf("Failed to parse implicit prices from annotations: %v", err)
+		}
+	}
+
+	return prices, nil
 }
 
 func parseHLedgerCommodities(journalPath string) ([]string, error) {
@@ -504,16 +534,52 @@ func parseHLedgerPrices(output string, defaultCurrency string) ([]price.Price, e
 
 func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price, error) {
 	var prices []price.Price
-	re := regexp.MustCompile(`(\d{4}-\d{2}-\d{2}) price ([^ ]+)\s*([^\n]+)\n`)
-	matches := re.FindAllStringSubmatch(output, -1)
+	const expectedColumnCount = 4
 
-	for _, match := range matches {
-		target, value, err := parseAmount(match[3])
-		if err != nil {
-			return nil, err
+	// Parse CSV output from bean-query
+	reader := csv.NewReader(strings.NewReader(output))
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	// Return early if no records
+	if len(records) == 0 {
+		return prices, nil
+	}
+
+	// Skip header row if present (bean-query -f csv adds a header)
+	// Check if first row has expected column count and first column is "date"
+	startIdx := 0
+	if len(records[0]) >= expectedColumnCount && strings.EqualFold(records[0][0], "date") {
+		startIdx = 1
+	}
+
+	for _, record := range records[startIdx:] {
+		if len(record) < expectedColumnCount {
+			continue
 		}
 
-		commodity := utils.UnQuote(match[2])
+		dateStr := strings.TrimSpace(record[0])
+		if dateStr == "" {
+			continue
+		}
+
+		commodity := utils.UnQuote(strings.TrimSpace(record[1]))
+		target := utils.UnQuote(strings.TrimSpace(record[2]))
+		valueStr := strings.TrimSpace(record[3])
+
+		// Skip if any required field is effectively empty (though empty strings might be valid for some columns, not for these)
+		if commodity == "" || target == "" || valueStr == "" {
+			continue
+		}
+
+		value, err := decimal.NewFromString(valueStr)
+		if err != nil {
+			// If not a number, skip (could be header title if check failed?)
+			continue
+		}
+
 		if target != defaultCurrency {
 			if commodity == defaultCurrency && !value.Equal(decimal.Zero) {
 				commodity = target
@@ -524,14 +590,14 @@ func parseBeancountPrices(output string, defaultCurrency string) ([]price.Price,
 			}
 		}
 
-		date, err := time.ParseInLocation("2006-01-02", match[1], config.TimeZone())
+		date, err := time.ParseInLocation("2006-01-02", dateStr, config.TimeZone())
 		if err != nil {
 			return nil, err
 		}
 
 		prices = append(prices, price.Price{Date: date, CommodityName: commodity, CommodityID: commodity, CommodityType: config.Unknown, Value: value})
-
 	}
+
 	return prices, nil
 }
 

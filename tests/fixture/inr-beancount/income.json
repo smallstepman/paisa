@@ -4,8 +4,8 @@
       "date": "2022-01-01T00:00:00Z",
       "postings": [
         {
-          "id": 1,
-          "transaction_id": "425e0d0e256e24cddcbad886738d57bb",
+          "id": 726,
+          "transaction_id": "dc0e705117d1e605169680c76a82d473",
           "date": "2022-01-01T00:00:00Z",
           "payee": "Salary",
           "account": "Income:Salary:Acme",
@@ -25,8 +25,8 @@
           "balance": 0
         },
         {
-          "id": 5,
-          "transaction_id": "9c2c3e31540bad2f24f873c46def370b",
+          "id": 730,
+          "transaction_id": "31e61c1a96be634fe63b620f4f4fc51b",
           "date": "2022-01-06T00:00:00Z",
           "payee": "Bonus",
           "account": "Income:Salary:Acme",
@@ -46,13 +46,13 @@
           "balance": 0
         },
         {
-          "id": 14,
-          "transaction_id": "3b252f03f4e42a4cd3861e6b3dc6b8f1",
+          "id": 739,
+          "transaction_id": "48ae2b5038f5b7f50de1805adc8835a8",
           "date": "2022-01-10T00:00:00Z",
           "payee": "Sell",
           "account": "Income:CapitalGains:Equity:AAPL",
           "commodity": "INR",
-          "quantity": -27.3,
+          "quantity": -27,
           "amount": -27,
           "status": "cleared",
           "tag_recurring": "",
@@ -67,8 +67,8 @@
           "balance": 0
         },
         {
-          "id": 24,
-          "transaction_id": "5e31c18d8b6da4f8b27ee2eee680e3ed",
+          "id": 749,
+          "transaction_id": "7cc7b36faaf35a37bb798fb296fe220c",
           "date": "2022-01-31T00:00:00Z",
           "payee": "Interest",
           "account": "Income:Interest:Checking",
@@ -101,8 +101,8 @@
       "end_date": "2022-03-31T23:59:59.999999999Z",
       "postings": [
         {
-          "id": 1,
-          "transaction_id": "425e0d0e256e24cddcbad886738d57bb",
+          "id": 726,
+          "transaction_id": "dc0e705117d1e605169680c76a82d473",
           "date": "2022-01-01T00:00:00Z",
           "payee": "Salary",
           "account": "Income:Salary:Acme",
@@ -122,8 +122,8 @@
           "balance": 0
         },
         {
-          "id": 5,
-          "transaction_id": "9c2c3e31540bad2f24f873c46def370b",
+          "id": 730,
+          "transaction_id": "31e61c1a96be634fe63b620f4f4fc51b",
           "date": "2022-01-06T00:00:00Z",
           "payee": "Bonus",
           "account": "Income:Salary:Acme",
@@ -143,13 +143,13 @@
           "balance": 0
         },
         {
-          "id": 14,
-          "transaction_id": "3b252f03f4e42a4cd3861e6b3dc6b8f1",
+          "id": 739,
+          "transaction_id": "48ae2b5038f5b7f50de1805adc8835a8",
           "date": "2022-01-10T00:00:00Z",
           "payee": "Sell",
           "account": "Income:CapitalGains:Equity:AAPL",
           "commodity": "INR",
-          "quantity": -27.3,
+          "quantity": -27,
           "amount": -27,
           "status": "cleared",
           "tag_recurring": "",
@@ -164,8 +164,8 @@
           "balance": 0
         },
         {
-          "id": 24,
-          "transaction_id": "5e31c18d8b6da4f8b27ee2eee680e3ed",
+          "id": 749,
+          "transaction_id": "7cc7b36faaf35a37bb798fb296fe220c",
           "date": "2022-01-31T00:00:00Z",
           "payee": "Interest",
           "account": "Income:Interest:Checking",
