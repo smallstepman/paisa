@@ -61,6 +61,49 @@ func TestParseHLegerPrices(t *testing.T) {
 	assert.Len(t, parsedPrices, 0)
 }
 
+func TestParseBeancountPrices(t *testing.T) {
+	// Test CSV format from bean-query
+	// Format: date,currency,amount_currency,amount_number
+	// This means: on date, currency is worth amount_number amount_currency
+	csvOutput := `date,currency,amount_currency,amount_number
+2023-05-01,USD,EUR,0.9
+2023-05-02,NIFTY,INR,100
+2023-05-03,INR,USD,0.0124`
+
+	// When default currency is EUR, we want prices in EUR
+	parsedPrices, _ := parseBeancountPrices(csvOutput, "EUR")
+	assert.Len(t, parsedPrices, 1)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9)
+
+	// When default currency is INR
+	parsedPrices, _ = parseBeancountPrices(csvOutput, "INR")
+	assert.Len(t, parsedPrices, 2)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/02", "NIFTY", 100)
+	assertPriceEqual(t, parsedPrices[1], "2023/05/03", "USD", 80.64516129032258)
+
+	// Test CSV without header
+	csvNoHeader := `2023-05-01,NIFTY,INR,100
+2023-05-02,USD,INR,80.5`
+	parsedPrices, _ = parseBeancountPrices(csvNoHeader, "INR")
+	assert.Len(t, parsedPrices, 2)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "NIFTY", 100)
+	assertPriceEqual(t, parsedPrices[1], "2023/05/02", "USD", 80.5)
+
+	// Test with prices that need to be inverted
+	csvInverted := `2023-05-01,EUR,USD,1.1`
+	parsedPrices, _ = parseBeancountPrices(csvInverted, "EUR")
+	assert.Len(t, parsedPrices, 1)
+	assertPriceEqual(t, parsedPrices[0], "2023/05/01", "USD", 0.9090909090909091)
+
+	// Test empty CSV
+	parsedPrices, _ = parseBeancountPrices("", "INR")
+	assert.Len(t, parsedPrices, 0)
+
+	// Test CSV with only header
+	parsedPrices, _ = parseBeancountPrices("date,currency,amount_currency,amount_number\n", "INR")
+	assert.Len(t, parsedPrices, 0)
+}
+
 func TestParseAmount(t *testing.T) {
 	commodity, amount, _ := parseAmount("0.9 USD")
 	assert.Equal(t, "USD", commodity)
